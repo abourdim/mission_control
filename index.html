@@ -14,8 +14,7 @@
   </div>
 
   <div class="grid2">
-    <div class="col">
-      <div class="card">
+    <div class="card">
       <h2>Room</h2>
       <p class="muted">Open this same page on two devices, enter the same room code, then start & connect.</p>
 
@@ -34,44 +33,6 @@
       <pre id="log" class="log" style="white-space:pre-wrap"></pre>
     </div>
 
-      <div class="card">
-        <h2>Controls</h2>
-        <p class="muted small">Use these buttons to simulate a gamepad. Commands are sent to the other device over the data channel.</p>
-
-        <div class="vpad-grid">
-          <button class="btn big ghost vbtn" data-cmd="UP">⬆️</button>
-          <button class="btn big ghost vbtn" data-cmd="LEFT">⬅️</button>
-          <button class="btn big stop vbtn" data-cmd="STOP">⏹️</button>
-          <button class="btn big ghost vbtn" data-cmd="RIGHT">➡️</button>
-          <button class="btn big ghost vbtn" data-cmd="DOWN">⬇️</button>
-        </div>
-
-        <div class="row" style="margin-top:10px">
-          <button class="btn big ghost vbtn" data-btn="A">A</button>
-          <button class="btn big ghost vbtn" data-btn="B">B</button>
-          <button class="btn big ghost vbtn" data-btn="X">X</button>
-          <button class="btn big ghost vbtn" data-btn="Y">Y</button>
-        </div>
-
-        <div class="row" style="margin-top:10px">
-          <div class="pill small">Data: <span id="dataStatus">closed</span></div>
-          <div class="pill small">Last sent: <span id="lastSent">-</span></div>
-          <div class="pill small">Last received: <span id="lastRecv">-</span></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Test messages</h2>
-        <p class="muted small">Send text to the other device (for testing).</p>
-        <div class="row" style="justify-content:flex-start">
-          <input id="textInput" class="input" placeholder="Type a message…" style="flex:1;min-width:220px" />
-          <button id="sendTextBtn" class="btn big">Send ✉️</button>
-        </div>
-        <pre id="msgLog" class="log" style="white-space:pre-wrap"></pre>
-      </div>
-
-    </div>
-
     <div class="card">
       <h2>Live</h2>
       <div class="grid2">
@@ -85,6 +46,47 @@
         </div>
       </div>
     </div>
+
+<div class="card">
+  <h2>Controls</h2>
+  <p class="muted">Virtual buttons (no physical gamepad). Press/hold to send commands to the other device.</p>
+
+  <div class="controlsWrap">
+    <div class="controlsBlock">
+      <div class="muted small">D‑pad</div>
+      <div class="dpad" id="vpad">
+        <button class="btn d" data-dir="UP">▲</button>
+        <div class="row">
+          <button class="btn d" data-dir="LEFT">◀</button>
+          <button class="btn d stop" data-dir="STOP">■</button>
+          <button class="btn d" data-dir="RIGHT">▶</button>
+        </div>
+        <button class="btn d" data-dir="DOWN">▼</button>
+      </div>
+
+      <div style="height:10px"></div>
+      <div class="muted small">Buttons</div>
+      <div class="row">
+        <button class="btn" data-btn="A">A</button>
+        <button class="btn" data-btn="B">B</button>
+        <button class="btn" data-btn="X">X</button>
+        <button class="btn" data-btn="Y">Y</button>
+      </div>
+    </div>
+
+    <div class="controlsBlock">
+      <div class="muted small">Send text (testing)</div>
+      <div class="row" style="justify-content:flex-start">
+        <input id="textInput" class="input" placeholder="Type text…" style="flex:1;min-width:220px" />
+        <button id="sendTextBtn" class="btn">Send ✉️</button>
+      </div>
+
+      <div style="height:10px"></div>
+      <div class="muted small">Received</div>
+      <pre id="rxLog" class="log" style="max-height:220px"></pre>
+    </div>
+  </div>
+</div>
   </div>
 
   <script>

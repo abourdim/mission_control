@@ -19,11 +19,8 @@ const remoteVideo = $("remoteVideo");
 const statusPill = $("status");
 const logEl = $("log");
 
-const dataStatusEl = $("dataStatus");
-const lastSentEl = $("lastSent");
-const lastRecvEl = $("lastRecv");
-const msgLogEl = $("msgLog");
-const textInputEl = $("textInput");
+const rxLog = $("rxLog");
+const textInput = $("textInput");
 const sendTextBtn = $("sendTextBtn");
 
 function setStatus(t){ if(statusPill) statusPill.textContent = t; }
@@ -33,49 +30,41 @@ function log(...args){
   if (logEl) logEl.textContent += line + "\n";
 }
 
-function msgLog(...args){
+function logRx(...args){
   const line = args.map(a => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
-  if (msgLogEl) msgLogEl.textContent += line + "\n";
+  console.log("[RX]", line);
+  if (rxLog) rxLog.textContent += line + "\n";
 }
 
-function setDataStatus(t){
-  if (dataStatusEl) dataStatusEl.textContent = t;
-}
-
-function setLastSent(t){ if (lastSentEl) lastSentEl.textContent = t; }
-function setLastRecv(t){ if (lastRecvEl) lastRecvEl.textContent = t; }
-
-function sendData(obj){
-  if (!dataConn || !dataConn.open) return false;
-  try{
-    dataConn.send(obj);
-    setLastSent(obj.type === "text" ? ("text: " + obj.text) : (obj.type + ":" + (obj.cmd||obj.id||"")));
-    return true;
-  }catch(e){
-    log("Data send error:", e?.message || String(e));
-    return false;
-  }
-}
-
-function attachDataConn(conn){
+function setDataConn(conn){
+  if (!conn) return;
+  try { dataConn?.close(); } catch {}
   dataConn = conn;
-  setDataStatus("open");
-  msgLog("[data] open with", conn.peer);
 
+  conn.on("open", () => {
+    log("Data channel open ✅");
+  });
   conn.on("data", (msg) => {
-    setLastRecv(msg.type === "text" ? ("text: " + msg.text) : (msg.type + ":" + (msg.cmd||msg.id||"")));
-    msgLog("[recv]", msg);
+    if (msg && typeof msg === "object"){
+      if (msg.type === "text") logRx("TEXT:", msg.text);
+      else if (msg.type === "cmd") logRx("CMD:", msg.cmd, msg.pressed ? "down" : "up");
+      else if (msg.type === "btn") logRx("BTN:", msg.id, msg.pressed ? "down" : "up");
+      else logRx(msg);
+    } else {
+      logRx(msg);
+    }
   });
-
   conn.on("close", () => {
-    setDataStatus("closed");
-    msgLog("[data] closed");
+    log("Data channel closed");
   });
-
   conn.on("error", (e) => {
-    setDataStatus("error");
-    msgLog("[data] error:", e?.message || String(e));
+    log("Data channel error:", e?.message || String(e));
   });
+}
+
+function sendMsg(obj){
+  if (!dataConn || !dataConn.open) return false;
+  try { dataConn.send(obj); return true; } catch { return false; }
 }
 
 let localStream = null;
@@ -293,13 +282,18 @@ async function connect(){
       setStatus("Calling other device…");
       const c = peer.call(hostId, localStream);
       attachCallHandlers(c);
-      // Open data channel for controls/text
+      // Data channel to host
       const dc = peer.connect(hostId, { reliable: true });
-      dc.on("open", () => { log("Data channel open (guest)"); attachDataConn(dc); });
-      dc.on("error", (e) => { log("Data channel error (guest):", e?.message || String(e)); });
+      dc.on('open', () => log('Data channel connecting…'));
+      setDataConn(dc);
     });
 
-    peer.on("call", (incoming) => {
+    peer.on("connection", (conn) => {
+    log("Incoming data connection from:", conn.peer);
+    setDataConn(conn);
+  });
+
+  peer.on("call", (incoming) => {
       // In case both sides race, still answer.
       log("Incoming call (guest) from:", incoming.peer);
       incoming.answer(localStream);
@@ -318,11 +312,6 @@ async function connect(){
     isHost = true;
     log("Peer open (host):", id);
     setStatus("Waiting for other device…");
-  });
-
-  peer.on("connection", (conn) => {
-    log("Data connection (host) from:", conn.peer);
-    attachDataConn(conn);
   });
 
   peer.on("call", (incoming) => {
@@ -363,71 +352,9 @@ connectBtn?.addEventListener("click", async () => {
   }
 });
 
-
-sendTextBtn?.addEventListener("click", () => {
-  const txt = (textInputEl?.value || "").trim();
-  if (!txt) return;
-  if (!sendData({ type: "text", text: txt })) {
-    msgLog("[warn] data channel not open");
-    return;
-  }
-  msgLog("[sent]", txt);
-  if (textInputEl) textInputEl.value = "";
-});
-
-textInputEl?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    sendTextBtn?.click();
-  }
-});
-
-function wireVirtualGamepad(){
-  const pressMap = new Map();
-  const buttons = document.querySelectorAll(".vbtn");
-  buttons.forEach((btn) => {
-    const cmd = btn.getAttribute("data-cmd");
-    const bid = btn.getAttribute("data-btn");
-
-    const onDown = (ev) => {
-      ev.preventDefault();
-      const key = cmd ? ("cmd:"+cmd) : ("btn:"+bid);
-      if (pressMap.get(key)) return; // already pressed
-      pressMap.set(key, true);
-
-      if (cmd){
-        sendData({ type: "cmd", cmd, pressed: true });
-      } else if (bid){
-        sendData({ type: "btn", id: bid, pressed: true });
-      }
-    };
-
-    const onUp = (ev) => {
-      ev.preventDefault();
-      const key = cmd ? ("cmd:"+cmd) : ("btn:"+bid);
-      if (!pressMap.get(key)) return;
-      pressMap.set(key, false);
-
-      if (cmd){
-        sendData({ type: "cmd", cmd, pressed: false });
-        if (cmd !== "STOP") sendData({ type: "cmd", cmd: "STOP", pressed: true }); // safety stop on release
-      } else if (bid){
-        sendData({ type: "btn", id: bid, pressed: false });
-      }
-    };
-
-    btn.addEventListener("pointerdown", onDown);
-    btn.addEventListener("pointerup", onUp);
-    btn.addEventListener("pointercancel", onUp);
-    btn.addEventListener("pointerleave", onUp);
-  });
-}
-wireVirtualGamepad();
-
 hangupBtn?.addEventListener("click", () => {
   cleanupPeer();
   setStatus("Idle");
-setDataStatus("closed");
 });
 
 switchCamBtn?.addEventListener("click", () => {
@@ -448,6 +375,45 @@ flipRemoteBtn?.addEventListener("click", () => {
   setRemoteFlip(!isRemoteFlipped);
   log("Remote flip:", isRemoteFlipped ? "ON" : "OFF");
 });
+
+sendTextBtn?.addEventListener("click", () => {
+  const t = (textInput?.value || "").trim();
+  if (!t) return;
+  if (!sendMsg({ type: "text", text: t })) {
+    log("Text not sent (not connected yet).");
+    return;
+  }
+  log("Text sent:", t);
+  textInput.value = "";
+});
+
+textInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") sendTextBtn?.click();
+});
+
+function bindVirtualControls(){
+  // D-pad: send pressed true on down, false on up/leave
+  document.querySelectorAll("[data-dir]").forEach((btn) => {
+    const cmd = btn.getAttribute("data-dir");
+    const down = (e) => { e.preventDefault(); sendMsg({ type: "cmd", cmd, pressed: true }); };
+    const up = (e) => { e.preventDefault(); sendMsg({ type: "cmd", cmd, pressed: false }); };
+    btn.addEventListener("pointerdown", down);
+    btn.addEventListener("pointerup", up);
+    btn.addEventListener("pointercancel", up);
+    btn.addEventListener("pointerleave", up);
+  });
+
+  // Buttons: click sends a tap (down then up)
+  document.querySelectorAll("[data-btn]").forEach((btn) => {
+    const id = btn.getAttribute("data-btn");
+    btn.addEventListener("pointerdown", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: true }); });
+    btn.addEventListener("pointerup", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: false }); });
+    btn.addEventListener("pointercancel", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: false }); });
+    btn.addEventListener("pointerleave", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: false }); });
+  });
+}
+
+bindVirtualControls();
 
 // Nice default status
 setStatus("Idle");
