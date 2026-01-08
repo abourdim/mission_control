@@ -1,46 +1,105 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-  <meta charset="utf-8">
-  <title>Telepresence</title>
-  <link rel="stylesheet" href="css/style.css">
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kid Telepresence</title>
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 
-<h2>Telepresence (stable)</h2>
+  <div class="topbar">
+    <div class="title">Kid Telepresence</div>
+    <div id="status" class="pill">Idle</div>
+  </div>
 
-<div class="card">
-  <input id="room" placeholder="Room code" value="demo">
-  <button id="startCam">Start camera</button>
-  <button id="connect">Connect</button>
-  <div id="status">Idle</div>
-</div>
+  <div class="grid2">
+    <div class="card">
+      <h2>Room</h2>
+      <p class="muted">Open this same page on two devices, enter the same room code, then start & connect.</p>
 
-<div class="card">
-  <video id="localVideo" autoplay muted playsinline></video>
-  <video id="remoteVideo" autoplay playsinline></video>
-</div>
+      <label>Room code</label>
+      <input id="roomInput" class="input" placeholder="e.g. 1234" value="demo" />
 
-<div class="card">
-  <h3>Controls</h3>
-  <div class="dpad">
-    <button data-cmd="UP">▲</button>
-    <div>
-      <button data-cmd="LEFT">◀</button>
-      <button data-cmd="STOP">■</button>
-      <button data-cmd="RIGHT">▶</button>
+      <div class="row">
+        <button id="startBtn" class="btn big">Start camera 🎥</button>
+        <button id="switchCamBtn" class="btn big ghost" disabled>Switch camera 🔄</button>
+        <button id="flipBtn" class="btn big ghost" disabled>Mirror self 🪞</button>
+        <button id="flipRemoteBtn" class="btn big ghost" disabled>Flip remote ↔️</button>
+        <button id="connectBtn" class="btn big">Connect ✅</button>
+        <button id="hangupBtn" class="btn big ghost" style="display:none">Hang up ✋</button>
+      </div>
+
+      <pre id="log" class="log" style="white-space:pre-wrap"></pre>
     </div>
-    <button data-cmd="DOWN">▼</button>
+
+    <div class="card">
+      <h2>Live</h2>
+      <div class="grid2">
+        <div>
+          <div class="muted">You</div>
+          <video id="localVideo" class="video" autoplay playsinline muted></video>
+        </div>
+        <div>
+          <div class="muted">Other device</div>
+          <video id="remoteVideo" class="video" autoplay playsinline></video>
+        </div>
+      </div>
+    </div>
+
+<div class="card">
+  <h2>Controls</h2>
+  <p class="muted">Virtual buttons (no physical gamepad). Press/hold to send commands to the other device.</p>
+
+  <div class="controlsWrap">
+    <div class="controlsBlock">
+      <div class="muted small">D‑pad</div>
+      <div class="dpad" id="vpad">
+        <button class="btn d" data-dir="UP">▲</button>
+        <div class="row">
+          <button class="btn d" data-dir="LEFT">◀</button>
+          <button class="btn d stop" data-dir="STOP">■</button>
+          <button class="btn d" data-dir="RIGHT">▶</button>
+        </div>
+        <button class="btn d" data-dir="DOWN">▼</button>
+      </div>
+
+      <div style="height:10px"></div>
+      <div class="muted small">Buttons</div>
+      <div class="row">
+        <button class="btn" data-btn="A">A</button>
+        <button class="btn" data-btn="B">B</button>
+        <button class="btn" data-btn="X">X</button>
+        <button class="btn" data-btn="Y">Y</button>
+      </div>
+    </div>
+
+    <div class="controlsBlock">
+      <div class="muted small">Send text (testing)</div>
+      <div class="row" style="justify-content:flex-start">
+        <input id="textInput" class="input" placeholder="Type text…" style="flex:1;min-width:220px" />
+        <button id="sendTextBtn" class="btn">Send ✉️</button>
+      </div>
+
+      <div style="height:10px"></div>
+      <div class="muted small">Received</div>
+      <pre id="rxLog" class="log" style="max-height:220px"></pre>
+    </div>
   </div>
 </div>
+  </div>
 
-<div class="card">
-  <input id="textInput" placeholder="Send text">
-  <button id="sendText">Send</button>
-  <pre id="log"></pre>
-</div>
+  <script>
+    // Load PeerJS then app logic
+    const s1 = document.createElement('script');
+    s1.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+    s1.onload = () => {
+      const s2 = document.createElement('script');
+      s2.src = 'js/app.js';
+      document.body.appendChild(s2);
+    };
+    document.body.appendChild(s1);
+  </script>
 
-<script src="js/app.js"></script>
 </body>
 </html>
