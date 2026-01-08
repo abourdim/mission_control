@@ -24,6 +24,8 @@ const gpStatus = $("gpStatus");
 const gpSendState = $("gpSendState");
 const gpLocalEl = $("gpLocal");
 const gpRemoteEl = $("gpRemote");
+const gpEnableBtn = $("gpEnableBtn");
+let gpEnabled = false;
 
 function setStatus(t){ if(statusPill) statusPill.textContent = t; }
 function log(...args){
@@ -435,12 +437,16 @@ function updateGpUI(localState, sentOk){
 }
 
 function gpLoop(now){
+  if (!gpEnabled){
+    requestAnimationFrame(gpLoop);
+    return;
+  }
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
   const gp = (gpActiveIndex != null) ? pads[gpActiveIndex] : (pads && [...pads].find(p => p && p.connected));
 
   if (!gp){
     gpActiveIndex = null;
-    setGpStatus("No gamepad");
+    setGpStatus(gpEnabled ? "No gamepad" : "Gamepad disabled");
     updateGpUI(null, false);
     requestAnimationFrame(gpLoop);
     return;
@@ -472,11 +478,21 @@ window.addEventListener("gamepadconnected", (e) => {
 
 window.addEventListener("gamepaddisconnected", (e) => {
   log("Gamepad disconnected:", e.gamepad?.id || "(unknown)");
-  setGpStatus("No gamepad");
+  setGpStatus(gpEnabled ? "No gamepad" : "Gamepad disabled");
   gpActiveIndex = null;
 });
 
-// Start polling immediately (safe even without a gamepad)
+// Gamepad enable button (some browsers expose gamepads only after a user gesture)
+if (gpEnableBtn){
+  gpEnableBtn.addEventListener("click", () => {
+    gpEnabled = true;
+    setGpStatus("Waiting for gamepad… press any button");
+    log("Gamepad enabled: press any button on the controller to activate it.");
+  });
+}
+setGpStatus("Gamepad disabled");
+
+// Start polling loop (it will activate once enabled)
 requestAnimationFrame(gpLoop);
 
 // Nice default status
