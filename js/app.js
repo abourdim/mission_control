@@ -284,7 +284,6 @@ let dataConn = null;
 // micro:bit BLE UART bridge
 let microbit = null;
 let mbBridgeEnabled = false;
-    stopSafetyWatchdog();
 // ---- Safety: auto STOP on disconnect / inactivity ----
 let _lastPeerControlMs = Date.now();
 let _safetyTimer = null;
