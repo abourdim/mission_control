@@ -20,9 +20,10 @@ const remoteVideo = $("remoteVideo");
 const videoStage = $("videoStage");
 const remoteFsBtn = $("remoteFsBtn");
 const statusPill = $("status");
+const connPill = $("connPill");
 const logEl = $("log");
+const clearLogsBtn = $("clearLogsBtn");
 
-const rxLog = $("rxLog");
 const textInput = $("textInput");
 const sendTextBtn = $("sendTextBtn");
 
@@ -67,7 +68,21 @@ document.addEventListener("fullscreenchange", updateFsButton);
 updateFsButton();
 
 
-function setStatus(t){ if(statusPill) statusPill.textContent = t; }
+function setStatus(t){
+  // Keep the chip-dot span intact; only update the text span.
+  if (!statusPill) return;
+  const spans = statusPill.querySelectorAll("span");
+  if (spans && spans.length >= 2) spans[1].textContent = t;
+  else statusPill.textContent = t;
+}
+
+function setConnStatus(text, connected=false){
+  if (!connPill) return;
+  const spans = connPill.querySelectorAll("span");
+  if (spans && spans.length >= 2) spans[1].textContent = text;
+  else connPill.textContent = text;
+  connPill.classList.toggle("connected", !!connected);
+}
 function log(...args){
   const line = args.map(a => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
   console.log(line);
@@ -77,8 +92,16 @@ function log(...args){
 function logRx(...args){
   const line = args.map(a => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
   console.log("[RX]", line);
-  if (rxLog) rxLog.textContent += line + "\n";
+  // RX goes into the main log (single log panel)
+  if (logEl) logEl.textContent += "[RX] " + line + "\n";
 }
+
+clearLogsBtn?.addEventListener("click", () => {
+  if (logEl) logEl.textContent = "";
+  // Also clear pending ACK diagnostics so log doesn't immediately refill with stale timeouts.
+  _pending.clear();
+  log("Logs cleared.");
+});
 
 function setDataConn(conn){
   if (!conn) return;
@@ -88,6 +111,7 @@ function setDataConn(conn){
   conn.on("open", () => {
     log("Data channel open ✅");
     enableControls(true);
+    setConnStatus("Connected", true);
   });
   conn.on("data", (msg) => {
     // ACK handler
@@ -122,9 +146,12 @@ function setDataConn(conn){
   conn.on("close", () => {
     log("Data channel closed");
     enableControls(false);
+    // If media is still up, we may still be "connected" video-wise, so don't force red.
+    if (!call) setConnStatus("Not connected", false);
   });
   conn.on("error", (e) => {
     log("Data channel error:", e?.message || String(e));
+    if (!call) setConnStatus("Not connected", false);
   });
 }
 
@@ -354,11 +381,14 @@ function cleanupPeer(){
   // Keep flip state (UI preference) but ensure class is applied consistently
   setRemoteFlip(isRemoteFlipped);
   hangupBtn.style.display = "none";
+  setConnStatus("Not connected", false);
 }
 
 function attachCallHandlers(c){
   call = c;
   hangupBtn.style.display = "";
+  // Data channel and media may connect in either order; show a useful intermediate state.
+  setConnStatus("Connecting…", false);
 
   // --- Data channel robustness ---
   // In practice, the media call and the data connection can open in either order.
@@ -385,6 +415,7 @@ function attachCallHandlers(c){
     // Re-apply remote flip preference after the element starts rendering
     setRemoteFlip(isRemoteFlipped);
     setStatus("Connected ✅");
+    setConnStatus("Connected", true);
     if (remoteFsBtn) remoteFsBtn.disabled = false;
   });
 
@@ -394,6 +425,7 @@ function attachCallHandlers(c){
   c.on("close", () => {
     log("Call closed");
     setStatus("Disconnected");
+    setConnStatus("Not connected", false);
     if (remoteVideo) remoteVideo.srcObject = null;
     if (remoteFsBtn) remoteFsBtn.disabled = true;
     hangupBtn.style.display = "none";
@@ -418,6 +450,7 @@ async function connect(){
 
   hostId = `${encodeURIComponent(roomCode)}-host`;
   setStatus("Connecting…");
+  setConnStatus("Connecting…", false);
   log("Room:", roomCode, "Host ID:", hostId);
 
   // Try to become host first (no role selection).
@@ -435,6 +468,7 @@ async function connect(){
     peer.on("open", (id) => {
       log("Peer open (guest):", id);
       setStatus("Calling other device…");
+      setConnStatus("Calling…", false);
       const c = peer.call(hostId, localStream);
       attachCallHandlers(c);
       // Data channel to host
@@ -469,6 +503,7 @@ async function connect(){
     isHost = true;
     log("Peer open (host):", id);
     setStatus("Waiting for other device…");
+    setConnStatus("Waiting…", false);
   });
 
   peer.on("call", (incoming) => {
@@ -587,4 +622,5 @@ bindVirtualControls();
 
 // Nice default status
 setStatus("Idle");
+setConnStatus("Not connected", false);
 

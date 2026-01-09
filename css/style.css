@@ -515,6 +515,54 @@ button:disabled {
     gap: 8px;
 }
 
+/* Controls layout: D-pad full-width with Buttons panel on the right */
+.controls-row{
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    flex-wrap: wrap;
+}
+
+.dpad-section{
+    flex: 1 1 520px;
+}
+
+/* Right-side column next to the D-pad */
+.controls-side{
+    flex: 0 0 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.buttons-section,
+.sendtext-section{
+    width: 100%;
+}
+
+@media (max-width: 900px){
+    .controls-side{
+        flex: 1 1 280px;
+    }
+}
+
+/* Ensure decorative pseudo-elements never block clicks (important for buttons) */
+.card::before,
+.card::after,
+.chip::after{
+    pointer-events: none;
+}
+
+/* Make the D-pad wrapper comfortably fill its section */
+.dpad-section .dpad-wrapper{
+    width: 100%;
+}
+
+/* Logs card should look like a standalone card (not nested) */
+.log-card .log{
+    max-height: 260px;
+}
+
 /* Control sections */
 
 .control-section {
@@ -1829,5 +1877,13 @@ button {
 button.disabled{
   opacity: 0.45 !important;
   cursor: not-allowed !important;
+}
+
+/* Ensure decorative pseudo-elements never block clicks */
+.card::before,
+.card::after,
+.sensor-card::before,
+.chip::after{
+  pointer-events: none;
 }
 
