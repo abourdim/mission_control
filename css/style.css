@@ -1909,3 +1909,12 @@ button.disabled{
 
 /* Slightly tighten controls card padding */
 .dpad-section { padding-bottom: 6px; }
+
+/* === micro:bit Live Link layout === */
+.row-room-mb { align-items: stretch; }
+.row-room-mb .col-left, .row-room-mb .col-right { display:flex; flex-direction:column; }
+#microbitCard .button-row { flex-wrap: wrap; }
+#microbitCard button { white-space: nowrap; }
+
+/* Ensure decorative card layers never block clicks */
+.card::before, .card::after { pointer-events: none; }

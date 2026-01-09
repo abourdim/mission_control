@@ -27,6 +27,15 @@ const clearLogsBtn = $("clearLogsBtn");
 const textInput = $("textInput");
 const sendTextBtn = $("sendTextBtn");
 
+// micro:bit Live Link UI
+const mbStatus = $("mbStatus");
+const mbConnectBtn = $("mbConnectBtn");
+const mbDisconnectBtn = $("mbDisconnectBtn");
+const mbSendTestBtn = $("mbSendTestBtn");
+const mbBridgeOnBtn = $("mbBridgeOnBtn");
+const mbBridgeOffBtn = $("mbBridgeOffBtn");
+const mbMuteMbBtn = $("mbMuteMbBtn");
+
 // Disable controls until data channel is open
 function enableControls(on){
   const disabled = !on;
@@ -83,18 +92,25 @@ function setConnStatus(text, connected=false){
   else connPill.textContent = text;
   connPill.classList.toggle("connected", !!connected);
 }
-function log(...args){
-  const line = args.map(a => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
-  console.log(line);
-  if (logEl) logEl.textContent += line + "\n";
-}
 
-function logRx(...args){
-  const line = args.map(a => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
-  console.log("[RX]", line);
-  // RX goes into the main log (single log panel)
-  if (logEl) logEl.textContent += "[RX] " + line + "\n";
+function _fmt(v){
+  if (v === null) return "null";
+  if (v === undefined) return "undefined";
+  if (typeof v === "string") return v;
+  try { return JSON.stringify(v); } catch { return String(v); }
 }
+function logEvent({dir="SYS", src="APP", msg=""} = {}){
+  const logEl = $("log");
+  const line = `[${dir}][${src}] ${msg}`;
+  if (logEl) logEl.textContent += line + "\n";
+  // keep log scrolled to bottom unless user has scrolled up a lot
+  if (logEl && (logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight) < 40) {
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+}
+// Backwards-compatible helpers
+function log(...args){ logEvent({dir:"SYS", src:"APP", msg: args.map(_fmt).join(" ")}); }
+function logRx(...args){ logEvent({dir:"RX", src:"PEER", msg: args.map(_fmt).join(" ")}); }
 
 clearLogsBtn?.addEventListener("click", () => {
   if (logEl) logEl.textContent = "";
@@ -115,32 +131,32 @@ function setDataConn(conn){
   });
   conn.on("data", (msg) => {
     // ACK handler
-    if (msg && typeof msg === "object" && msg.type === "ack"){
-      const id = msg._id || msg.id;
-      if (id && _pending.has(id)){
-        _pending.delete(id);
-        logRx("ACK:", id);
+    if (msg && typeof msg === "object" && msg.type === "ack" && msg.id){
+      if (_pending.has(msg.id)){
+        _pending.delete(msg.id);
+        logEvent({dir:"RX", src:"ACK", msg: "ack for " + msg.id});
       } else {
-        logRx("ACK (unknown):", id || msg);
+        logEvent({dir:"RX", src:"ACK", msg: "late/unknown ack " + msg.id});
       }
       return;
     }
 
-    // Normal messages: display + reply ACK
+    // Normal messages: log + reply ACK
     if (msg && typeof msg === "object"){
-      const id = msg._id || msg.id;
+      const src = (msg.type === "cmd") ? "DPAD" :
+                  (msg.type === "btn") ? "BUTTONS" :
+                  (msg.type === "text") ? "TEXT" : "PEER";
+      logEvent({dir:"RX", src, msg: _fmt(msg)});
 
-      if (msg.type === "text") logRx("TEXT:", msg.text);
-      else if (msg.type === "cmd") logRx("CMD:", msg.cmd, msg.pressed ? "down" : "up");
-      else if (msg.type === "btn") logRx("BTN:", msg.id, msg.pressed ? "down" : "up");
-      else logRx(msg);
+      // Forward received commands to micro:bit if bridge enabled
+      if (mbBridgeEnabled) forwardToMicrobitFromPeer(msg);
 
-      // Send ACK back for anything with an id
-      if (id && dataConn && dataConn.open){
-        try { dataConn.send({ type: "ack", _id: id, _ts: Date.now() }); } catch {}
+      // ACK back for anything that has _id
+      if (msg._id){
+        try{ conn.send({ type:"ack", id: msg._id }); }catch{}
       }
     } else {
-      logRx(msg);
+      logEvent({dir:"RX", src:"PEER", msg: _fmt(msg)});
     }
   });
   conn.on("close", () => {
@@ -160,27 +176,31 @@ function setDataConn(conn){
 let _seq = 1;
 const _pending = new Map(); // id -> {t, msg}
 
+
 function sendMsg(obj){
-  const id = obj && (obj._id || obj.id) ? (obj._id || obj.id) : String(_seq++);
-  const msg = (obj && typeof obj === "object") ? { ...obj, _id: id, _ts: Date.now() } : obj;
+  const id = obj && (obj._id || obj.id) || ("m" + Date.now() + "-" + Math.random().toString(16).slice(2));
+  const msg = Object.assign({}, obj, { _id: id });
+  const src = (obj && obj._src) || (
+    msg.type === "cmd" ? "DPAD" :
+    msg.type === "btn" ? "BUTTONS" :
+    msg.type === "text" ? "TEXT" :
+    msg.type === "ack" ? "ACK" : "APP"
+  );
 
   if (!dataConn || !dataConn.open){
-    log("Send skipped (data channel not open):", JSON.stringify(msg));
-    return false;
+    logEvent({dir:"TX", src, msg: "skipped (data channel not open): " + _fmt(msg)});
+    return null;
   }
   try{
     dataConn.send(msg);
-    _pending.set(id, { t: Date.now(), msg });
-    // Optional: show outgoing quickly
-    // log("Sent:", JSON.stringify(msg));
+    logEvent({dir:"TX", src, msg: _fmt(msg)});
+    _pending.set(id, { t: Date.now(), msg, tries: 1 });
     return id;
-  }catch(e){
-    log("Send failed:", e?.message || String(e));
-    return false;
+  } catch(e){
+    logEvent({dir:"SYS", src:"APP", msg: "Send failed: " + (e && e.message ? e.message : e)});
+    return null;
   }
 }
-
-// Mark timed-out pending messages (diagnostic)
 setInterval(() => {
   const now = Date.now();
   for (const [id, info] of _pending){
@@ -195,6 +215,10 @@ let localStream = null;
 let peer = null;
 let call = null;
 let dataConn = null;
+
+// micro:bit BLE UART bridge
+let microbit = null;
+let mbBridgeEnabled = false;
 
 let isHost = false;
 let hostId = null;
@@ -583,7 +607,7 @@ muteMicBtn?.addEventListener("click", () => {
 sendTextBtn?.addEventListener("click", () => {
   const t = (textInput?.value || "").trim();
   if (!t) return;
-  const mid = sendMsg({ type: "text", text: t });
+  const mid = sendMsg({ type: "text", text: t, _src: "TEXT" });
   if (!mid){
     log("Text not sent (data channel not open yet).");
     return;
@@ -600,8 +624,8 @@ function bindVirtualControls(){
   // D-pad: send pressed true on down, false on up/leave
   document.querySelectorAll("[data-dir]").forEach((btn) => {
     const cmd = btn.getAttribute("data-dir");
-    const down = (e) => { e.preventDefault(); sendMsg({ type: "cmd", cmd, pressed: true }); };
-    const up = (e) => { e.preventDefault(); sendMsg({ type: "cmd", cmd, pressed: false }); };
+    const down = (e) => { e.preventDefault(); sendMsg({ type: "cmd", cmd, pressed: true, _src: "DPAD" }); };
+    const up = (e) => { e.preventDefault(); sendMsg({ type: "cmd", cmd, pressed: false, _src: "DPAD" }); };
     btn.addEventListener("pointerdown", down);
     btn.addEventListener("pointerup", up);
     btn.addEventListener("pointercancel", up);
@@ -611,16 +635,190 @@ function bindVirtualControls(){
   // Buttons: click sends a tap (down then up)
   document.querySelectorAll("[data-btn]").forEach((btn) => {
     const id = btn.getAttribute("data-btn");
-    btn.addEventListener("pointerdown", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: true }); });
-    btn.addEventListener("pointerup", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: false }); });
-    btn.addEventListener("pointercancel", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: false }); });
-    btn.addEventListener("pointerleave", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: false }); });
+    btn.addEventListener("pointerdown", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: true, _src: "BUTTONS" }); });
+    btn.addEventListener("pointerup", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: false, _src: "BUTTONS" }); });
+    btn.addEventListener("pointercancel", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: false, _src: "BUTTONS" }); });
+    btn.addEventListener("pointerleave", (e) => { e.preventDefault(); sendMsg({ type: "btn", id, pressed: false, _src: "BUTTONS" }); });
   });
 }
 
 bindVirtualControls();
 
 // Nice default status
+
+
+// === micro:bit BLE UART (adapted from ble-uart.js) ===
+// ble-uart.js
+const UART_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+class MicrobitUart {
+  constructor({ onLog = () => {}, onRx = () => {}, onConnectionChange = () => {} } = {}) {
+    this.onLog = onLog;
+    this.onRx = onRx;
+    this.onConnectionChange = onConnectionChange;
+    this.device = null;
+    this.server = null;
+    this.writeChar = null;
+    this.notifyChar = null;
+  }
+
+  get connected() {
+    return !!(this.device && this.device.gatt && this.device.gatt.connected && this.writeChar);
+  }
+
+  async connect() {
+    this.device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: "BBC micro:bit" }],
+      optionalServices: [UART_SERVICE],
+    });
+
+    this.device.addEventListener("gattserverdisconnected", () => {
+      this._clear();
+      this.onConnectionChange(false);
+    });
+
+    this.server = await this.device.gatt.connect();
+    const service = await this.server.getPrimaryService(UART_SERVICE);
+    const chars = await service.getCharacteristics();
+
+    this.writeChar =
+      chars.find((c) => c.properties.writeWithoutResponse) ||
+      chars.find((c) => c.properties.write);
+
+    this.notifyChar = chars.find((c) => c.properties.notify);
+
+    if (this.notifyChar) {
+      await this.notifyChar.startNotifications();
+      this.notifyChar.addEventListener("characteristicvaluechanged", (e) => {
+        const text = new TextDecoder().decode(e.target.value).trim();
+        this.onRx(text);
+      });
+    }
+
+    this.onConnectionChange(true);
+  }
+
+  async disconnect() {
+    if (this.device?.gatt?.connected) this.device.gatt.disconnect();
+    this._clear();
+    this.onConnectionChange(false);
+  }
+
+  async sendLine(line) {
+    const msg = line.endsWith("\n") ? line : line + "\n";
+    const data = new TextEncoder().encode(msg);
+    for (let i = 0; i < data.length; i += 20) {
+      await this.writeChar.writeValueWithoutResponse(data.slice(i, i + 20));
+      await sleep(15);
+    }
+  }
+
+  _clear() {
+    this.device = null;
+    this.server = null;
+    this.writeChar = null;
+    this.notifyChar = null;
+  }
+}
+
+
+// UI + bridge helpers
+function mbSetStatus(text, ok=false){
+  if (!mbStatus) return;
+  mbStatus.classList.toggle("connected", !!ok);
+  const dot = '<span class="status-dot"></span>';
+  mbStatus.innerHTML = dot + '<span>' + text + '</span>';
+}
+
+function encodeForMicrobit(msg){
+  if (!msg || typeof msg !== "object") return "RAW " + _fmt(msg);
+  if (msg.type === "cmd"){
+    // e.g. CMD RIGHT 1
+    return `CMD ${msg.cmd} ${msg.pressed ? 1 : 0}`;
+  }
+  if (msg.type === "btn"){
+    // e.g. BTN A 1
+    return `BTN ${msg.id} ${msg.pressed ? 1 : 0}`;
+  }
+  if (msg.type === "text"){
+    return `TXT ${String(msg.text || "").slice(0, 40)}`;
+  }
+  return `MSG ${msg.type || "unknown"} ${JSON.stringify(msg).slice(0, 60)}`;
+}
+
+async function forwardToMicrobitFromPeer(msg){
+  if (!microbit || !microbit.connected) {
+    logEvent({dir:"SYS", src:"MB", msg:"bridge on but micro:bit not connected"});
+    return;
+  }
+  const line = encodeForMicrobit(msg);
+  try{
+    await microbit.sendLine(line);
+    logEvent({dir:"TX", src:"MB", msg: line});
+  } catch(e){
+    logEvent({dir:"SYS", src:"MB", msg:"send failed: " + (e?.message || e)});
+  }
+}
+
+// Setup micro:bit handlers
+(function initMicrobit(){
+  if (!mbConnectBtn) return;
+
+  microbit = new MicrobitUart({
+    onLog: (t) => logEvent({dir:"SYS", src:"MB", msg:String(t)}),
+    onRx: (t) => logEvent({dir:"RX", src:"MB", msg:String(t)}),
+    onConnectionChange: (ok) => {
+      mbSetStatus(ok ? "Connected" : "Disconnected", ok);
+      mbDisconnectBtn && (mbDisconnectBtn.disabled = !ok);
+      mbSendTestBtn && (mbSendTestBtn.disabled = !ok);
+      mbBridgeOnBtn && (mbBridgeOnBtn.disabled = !ok);
+      mbBridgeOffBtn && (mbBridgeOffBtn.disabled = !ok);
+      mbMuteMbBtn && (mbMuteMbBtn.disabled = !ok);
+      if (!ok) mbBridgeEnabled = false;
+    }
+  });
+
+  mbSetStatus("Disconnected", false);
+
+  mbConnectBtn.addEventListener("click", async () => {
+    try{
+      mbSetStatus("Connecting…", false);
+      await microbit.connect();
+      logEvent({dir:"SYS", src:"MB", msg:"connected"});
+    } catch(e){
+      mbSetStatus("Disconnected", false);
+      logEvent({dir:"SYS", src:"MB", msg:"connect failed: " + (e?.message || e)});
+    }
+  });
+
+  mbDisconnectBtn?.addEventListener("click", async () => {
+    try{
+      await microbit.disconnect();
+      logEvent({dir:"SYS", src:"MB", msg:"disconnected"});
+    } catch(e){
+      logEvent({dir:"SYS", src:"MB", msg:"disconnect failed: " + (e?.message || e)});
+    }
+  });
+
+  mbSendTestBtn?.addEventListener("click", async () => {
+    try{
+      await microbit.sendLine("TEST");
+      logEvent({dir:"TX", src:"MB", msg:"TEST"});
+    } catch(e){
+      logEvent({dir:"SYS", src:"MB", msg:"TEST failed: " + (e?.message || e)});
+    }
+  });
+
+  mbBridgeOnBtn?.addEventListener("click", () => {
+    mbBridgeEnabled = true;
+    logEvent({dir:"SYS", src:"MB", msg:"bridge enabled (peer → micro:bit)"});
+  });
+  mbBridgeOffBtn?.addEventListener("click", () => {
+    mbBridgeEnabled = false;
+    logEvent({dir:"SYS", src:"MB", msg:"bridge disabled"});
+  });
+})();
 setStatus("Idle");
 setConnStatus("Not connected", false);
 

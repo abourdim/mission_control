@@ -40,32 +40,7 @@
             </div>
           </div>
 
-          <!-- Room (beneath video) -->
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title"><span class="icon">🔗</span> Room</div>
-                <div class="card-subtitle">Open this page on two devices, enter the same room code, then start & connect.</div>
-              </div>
-              <div class="status-pill" id="connPill"><span class="status-dot"></span><span>Not connected</span></div>
-            </div>
-
-            <div class="connection-section-title">Room code</div>
-            <input id="roomInput" type="text" placeholder="e.g. 1234" value="demo" />
-
-            <div class="button-row" style="flex-wrap:wrap; margin-top:10px;">
-              <button id="startBtn" class="primary">🎥 Start camera</button>
-              <button id="muteMicBtn" class="secondary" disabled>🔇 Mute mic</button>
-              <button id="switchCamBtn" class="secondary" disabled>🔄 Switch camera</button>
-              <button id="flipBtn" class="secondary" disabled>🪞 Mirror self</button>
-              <button id="flipRemoteBtn" class="secondary" disabled>↔️ Flip remote</button>
-              <button id="connectBtn" class="primary">✅ Connect</button>
-              <button id="hangupBtn" class="secondary" style="display:none">✋ Hang up</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Controls on the RIGHT -->
+          <!-- Controls on the RIGHT -->
         <div class="col-right">
           <!-- Game controls on the RIGHT of the video (so you can control + watch at the same time) -->
           <div class="card">
@@ -131,7 +106,67 @@
       </div>
 
       <!-- Logs at the bottom (full width) -->
-      <div class="row">
+      
+      <div class="row row-room-mb">
+        <div class="col-left">
+          <!-- Room (beneath video) -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title"><span class="icon">🔗</span> Room</div>
+                <div class="card-subtitle">Open this page on two devices, enter the same room code, then start & connect.</div>
+              </div>
+              <div class="status-pill" id="connPill"><span class="status-dot"></span><span>Not connected</span></div>
+            </div>
+
+            <div class="connection-section-title">Room code</div>
+            <input id="roomInput" type="text" placeholder="e.g. 1234" value="demo" />
+
+            <div class="button-row" style="flex-wrap:wrap; margin-top:10px;">
+              <button id="startBtn" class="primary">🎥 Start camera</button>
+              <button id="muteMicBtn" class="secondary" disabled>🔇 Mute mic</button>
+              <button id="switchCamBtn" class="secondary" disabled>🔄 Switch camera</button>
+              <button id="flipBtn" class="secondary" disabled>🪞 Mirror self</button>
+              <button id="flipRemoteBtn" class="secondary" disabled>↔️ Flip remote</button>
+              <button id="connectBtn" class="primary">✅ Connect</button>
+              <button id="hangupBtn" class="secondary" style="display:none">✋ Hang up</button>
+            </div>
+          </div>
+        </div>
+        </div>
+        <div class="col-right">
+          
+          <div class="card" id="microbitCard">
+            <div class="card-header">
+              <div>
+                <div class="card-title"><span class="icon">🧩</span> micro:bit Live Link</div>
+                <div class="card-subtitle">Connect and stream commands.</div>
+              </div>
+              <div id="mbStatus" class="status-pill"><span class="status-dot"></span><span>Disconnected</span></div>
+            </div>
+
+            <div class="button-row">
+              <button id="mbConnectBtn" class="primary">🔗 Connect</button>
+              <button id="mbDisconnectBtn" class="secondary" disabled>✖ Disconnect</button>
+              <button id="mbSendTestBtn" class="secondary" disabled>🧪 Send TEST</button>
+            </div>
+
+            <div class="button-row">
+              <button id="mbBridgeOnBtn" class="secondary" disabled>🚀 Start sending</button>
+              <button id="mbBridgeOffBtn" class="secondary" disabled>🛑 Stop</button>
+              <button id="mbMuteMbBtn" class="secondary" disabled>🤫 Mute</button>
+            </div>
+
+            <div class="hint">
+              <div class="hint-title">Bridge mode</div>
+              <div>When enabled, commands received from the other device are forwarded to the micro:bit over BLE UART.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+<div class="row">
         <div class="col-left" style="flex: 1 1 100%;">
           <div class="card log-card">
             <div class="card-header">
