@@ -1987,16 +1987,48 @@ button.disabled{
   margin-top: auto;
 }
 
-/* === Thumb tweak: smaller + draggable === */
-.videoThumb{
-  width: min(26vw, 170px);
-  z-index: 5;
-  cursor: grab;
-  touch-action: none;
-}
 
-/* Ensure decorative pseudo-elements never block clicks */
-.card::before,
-.card::after{
-  pointer-events: none;
+/* === Remote fullscreen request overlay === */
+.remote-fs-overlay{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: rgba(2,6,23,0.72);
+  backdrop-filter: blur(4px);
+  z-index: 30;
+  pointer-events: auto;
+}
+.remote-fs-panel{
+  width:min(440px, 92%);
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,0.35);
+  background: radial-gradient(circle at top left, rgba(15,23,42,0.98), rgba(2,6,23,0.98));
+  padding: 14px 14px 12px;
+  box-shadow: 0 18px 44px rgba(0,0,0,0.55);
+  text-align: center;
+}
+.remote-fs-title{
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+}
+.remote-fs-subtitle{
+  color: #9ca3af;
+  font-size: 0.80rem;
+  margin-bottom: 12px;
+}
+.remote-fs-actions{
+  display:flex;
+  gap: 10px;
+  justify-content:center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.remote-fs-hint{
+  color:#6b7280;
+  font-size:0.72rem;
 }

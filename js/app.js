@@ -19,6 +19,11 @@ const localVideo = $("localVideo");
 const remoteVideo = $("remoteVideo");
 const videoStage = $("videoStage");
 const remoteFsBtn = $("remoteFsBtn");
+const askRemoteFsBtn = $("askRemoteFsBtn");
+const cleanCacheBtn = $("cleanCacheBtn");
+const remoteFsOverlay = $("remoteFsOverlay");
+const remoteFsAcceptBtn = $("remoteFsAcceptBtn");
+const remoteFsDenyBtn = $("remoteFsDenyBtn");
 const statusPill = $("status");
 const connPill = $("connPill");
 const logEl = $("log");
@@ -75,69 +80,6 @@ async function toggleRemoteFullscreen(){
 remoteFsBtn?.addEventListener("click", toggleRemoteFullscreen);
 document.addEventListener("fullscreenchange", updateFsButton);
 updateFsButton();
-
-// ---- Local thumbnail: smaller + draggable ----
-(function initThumbDrag(){
-  const el = localVideo;
-  const stage = videoStage;
-  if (!el || !stage) return;
-
-  el.style.touchAction = "none";
-  el.style.cursor = "grab";
-
-  let dragging = false;
-  let startX = 0, startY = 0;
-  let offsetX = 0, offsetY = 0;
-
-  function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
-
-  el.addEventListener("pointerdown", (ev) => {
-    dragging = true;
-    el.setPointerCapture(ev.pointerId);
-    el.style.cursor = "grabbing";
-
-    const stageRect = stage.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    startX = ev.clientX;
-    startY = ev.clientY;
-
-    // Current top-left relative to stage
-    offsetX = elRect.left - stageRect.left;
-    offsetY = elRect.top - stageRect.top;
-
-    // switch from right/bottom anchoring to left/top anchoring
-    el.style.right = "auto";
-    el.style.bottom = "auto";
-    el.style.left = offsetX + "px";
-    el.style.top = offsetY + "px";
-  });
-
-  el.addEventListener("pointermove", (ev) => {
-    if (!dragging) return;
-    const stageRect = stage.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-
-    const dx = ev.clientX - startX;
-    const dy = ev.clientY - startY;
-
-    const newLeft = offsetX + dx;
-    const newTop  = offsetY + dy;
-
-    const maxLeft = stageRect.width - elRect.width;
-    const maxTop  = stageRect.height - elRect.height;
-
-    el.style.left = clamp(newLeft, 8, maxLeft - 8) + "px";
-    el.style.top  = clamp(newTop,  8, maxTop - 8) + "px";
-  });
-
-  function endDrag(){
-    if (!dragging) return;
-    dragging = false;
-    el.style.cursor = "grab";
-  }
-  el.addEventListener("pointerup", endDrag);
-  el.addEventListener("pointercancel", endDrag);
-})();
 
 
 function setStatus(t){
@@ -210,7 +152,6 @@ function setDataConn(conn){
                   (msg.type === "btn") ? "BUTTONS" :
                   (msg.type === "text") ? "TEXT" : "PEER";
       logEvent({dir:"RX", src, msg: _fmt(msg)});
-      markPeerActivity();
 
       // Forward received commands to micro:bit if bridge enabled
       if (mbBridgeEnabled) forwardToMicrobitFromPeer(msg);
@@ -224,7 +165,6 @@ function setDataConn(conn){
     }
   });
   conn.on("close", () => {
-    safetyStop("peer disconnect");
     log("Data channel closed");
     enableControls(false);
     // If media is still up, we may still be "connected" video-wise, so don't force red.
@@ -284,51 +224,6 @@ let dataConn = null;
 // micro:bit BLE UART bridge
 let microbit = null;
 let mbBridgeEnabled = false;
-// ---- Safety: auto STOP on disconnect / inactivity ----
-let _lastPeerControlMs = Date.now();
-let _safetyTimer = null;
-const SAFETY_INACTIVITY_MS = 900;   // no commands for this long -> STOP
-const SAFETY_CHECK_MS = 250;
-
-function markPeerActivity(){
-  _lastPeerControlMs = Date.now();
-}
-
-async function safetyStop(reason=""){
-  // Only meaningful when we are bridging to a micro:bit robot
-  if (!(mbBridgeEnabled && microbit && microbit.connected)) {
-    // still log the event for visibility
-    logEvent({dir:"SYS", src:"SAFETY", msg:`auto-stop (${reason}) skipped (bridge off or micro:bit not connected)`});
-    return;
-  }
-  try{
-    const line = "CMD STOP 1";
-    await microbit.sendLine(line);
-    logEvent({dir:"TX", src:"MB", msg: `${line}  // auto-stop: ${reason}`});
-  } catch(e){
-    logEvent({dir:"SYS", src:"SAFETY", msg:`auto-stop failed: ${(e?.message||e)}`});
-  }
-}
-
-function startSafetyWatchdog(){
-  if (_safetyTimer) return;
-  _lastPeerControlMs = Date.now();
-  _safetyTimer = setInterval(() => {
-    const idle = Date.now() - _lastPeerControlMs;
-    if (idle > SAFETY_INACTIVITY_MS){
-      // trigger once per inactivity window
-      _lastPeerControlMs = Date.now();
-      safetyStop("inactivity");
-    }
-  }, SAFETY_CHECK_MS);
-}
-
-function stopSafetyWatchdog(){
-  if (_safetyTimer){
-    clearInterval(_safetyTimer);
-    _safetyTimer = null;
-  }
-}
 
 let isHost = false;
 let hostId = null;
@@ -512,6 +407,7 @@ function cleanupPeer(){
   hostId = null;
   if (remoteVideo) remoteVideo.srcObject = null;
   if (remoteFsBtn) remoteFsBtn.disabled = true;
+  if (askRemoteFsBtn) askRemoteFsBtn.disabled = true;
   // Keep flip state (UI preference) but ensure class is applied consistently
   setRemoteFlip(isRemoteFlipped);
   hangupBtn.style.display = "none";
@@ -551,18 +447,19 @@ function attachCallHandlers(c){
     setStatus("Connected ✅");
     setConnStatus("Connected", true);
     if (remoteFsBtn) remoteFsBtn.disabled = false;
+    if (askRemoteFsBtn) askRemoteFsBtn.disabled = false;
   });
 
   // Once we know who we're connected to, try to ensure a data channel exists.
   // (The peer id is available immediately; no need to wait for stream.)
   ensureDataTo(c.peer);
   c.on("close", () => {
-    safetyStop("call closed");
     log("Call closed");
     setStatus("Disconnected");
     setConnStatus("Not connected", false);
     if (remoteVideo) remoteVideo.srcObject = null;
     if (remoteFsBtn) remoteFsBtn.disabled = true;
+  if (askRemoteFsBtn) askRemoteFsBtn.disabled = true;
     hangupBtn.style.display = "none";
   });
   c.on("error", (e) => {
@@ -880,7 +777,6 @@ async function forwardToMicrobitFromPeer(msg){
     onLog: (t) => logEvent({dir:"SYS", src:"MB", msg:String(t)}),
     onRx: (t) => logEvent({dir:"RX", src:"MB", msg:String(t)}),
     onConnectionChange: (ok) => {
-      if (!ok) stopSafetyWatchdog();
       mbSetStatus(ok ? "Connected" : "Disconnected", ok);
       mbDisconnectBtn && (mbDisconnectBtn.disabled = !ok);
       mbSendTestBtn && (mbSendTestBtn.disabled = !ok);
@@ -924,7 +820,6 @@ async function forwardToMicrobitFromPeer(msg){
 
   mbBridgeOnBtn?.addEventListener("click", () => {
     mbBridgeEnabled = true;
-    startSafetyWatchdog();
     logEvent({dir:"SYS", src:"MB", msg:"bridge enabled (peer → micro:bit)"});
   });
   mbBridgeOffBtn?.addEventListener("click", () => {
@@ -934,3 +829,110 @@ async function forwardToMicrobitFromPeer(msg){
 })();
 setStatus("Idle");
 setConnStatus("Not connected", false);
+
+
+
+// ---------- UI messaging: remote fullscreen request ----------
+function _rid(){
+  return Math.random().toString(36).slice(2) + "-" + Date.now().toString(36);
+}
+
+function sendUiMessage(payload){
+  if (!dataConn || !dataConn.open){
+    logEvent({dir:"SYS", src:"UI", msg:"Data channel not open (cannot send UI request)"});
+    return false;
+  }
+  try{
+    dataConn.send(payload);
+    return true;
+  }catch(e){
+    logEvent({dir:"SYS", src:"UI", msg:"Failed to send UI message: " + (e?.message || String(e))});
+    return false;
+  }
+}
+
+let _remoteFsOverlayTimer = null;
+
+function showRemoteFsOverlay(requestId){
+  if (!remoteFsOverlay) return;
+  remoteFsOverlay.style.display = "flex";
+  remoteFsOverlay.setAttribute("aria-hidden", "false");
+
+  // auto-hide after 10s
+  if (_remoteFsOverlayTimer) clearTimeout(_remoteFsOverlayTimer);
+  _remoteFsOverlayTimer = setTimeout(() => {
+    hideRemoteFsOverlay();
+    // timeout counts as denied
+    sendUiMessage({type:"ui", cmd:"REMOTE_FULLSCREEN_RESPONSE", id: requestId, status:"DENIED_FULLSCREEN", reason:"timeout"});
+    logEvent({dir:"TX", src:"UI", msg:"DENIED_FULLSCREEN (timeout)"});
+  }, 10000);
+
+  const cleanup = () => {
+    if (_remoteFsOverlayTimer){ clearTimeout(_remoteFsOverlayTimer); _remoteFsOverlayTimer = null; }
+    remoteFsAcceptBtn?.removeEventListener("click", onAccept);
+    remoteFsDenyBtn?.removeEventListener("click", onDeny);
+  };
+
+  const onAccept = async () => {
+    cleanup();
+    hideRemoteFsOverlay();
+    try{
+      const stage = document.getElementById("videoStage") || document.documentElement;
+      await stage.requestFullscreen();
+      sendUiMessage({type:"ui", cmd:"REMOTE_FULLSCREEN_RESPONSE", id: requestId, status:"OK_FULLSCREEN", reason:""});
+      logEvent({dir:"TX", src:"UI", msg:"OK_FULLSCREEN"});
+    }catch(e){
+      sendUiMessage({type:"ui", cmd:"REMOTE_FULLSCREEN_RESPONSE", id: requestId, status:"DENIED_FULLSCREEN", reason:"error"});
+      logEvent({dir:"TX", src:"UI", msg:"DENIED_FULLSCREEN (error)"});
+    }
+  };
+
+  const onDeny = () => {
+    cleanup();
+    hideRemoteFsOverlay();
+    sendUiMessage({type:"ui", cmd:"REMOTE_FULLSCREEN_RESPONSE", id: requestId, status:"DENIED_FULLSCREEN", reason:"user"});
+    logEvent({dir:"TX", src:"UI", msg:"DENIED_FULLSCREEN (user)"});
+  };
+
+  remoteFsAcceptBtn?.addEventListener("click", onAccept);
+  remoteFsDenyBtn?.addEventListener("click", onDeny);
+
+  logEvent({dir:"RX", src:"UI", msg:"REMOTE_FULLSCREEN requested (overlay shown)"});
+}
+
+function hideRemoteFsOverlay(){
+  if (!remoteFsOverlay) return;
+  remoteFsOverlay.style.display = "none";
+  remoteFsOverlay.setAttribute("aria-hidden", "true");
+}
+
+function requestRemoteFullscreen(){
+  const id = _rid();
+  const ok = sendUiMessage({type:"ui", cmd:"REMOTE_FULLSCREEN_REQUEST", id});
+  if (ok){
+    logEvent({dir:"TX", src:"UI", msg:"REMOTE_FULLSCREEN_REQUEST " + id});
+  }
+}
+
+askRemoteFsBtn?.addEventListener("click", () => {
+  requestRemoteFullscreen();
+});
+
+cleanCacheBtn?.addEventListener("click", async () => {
+  try{
+    localStorage.clear();
+    sessionStorage.clear();
+    if ("caches" in window){
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ("serviceWorker" in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    logEvent({dir:"SYS", src:"CACHE", msg:"Cleared storage/cache; reloading..."});
+  }catch(e){
+    logEvent({dir:"SYS", src:"CACHE", msg:"Cache clear error: " + (e?.message || String(e))});
+  }
+  location.reload();
+});

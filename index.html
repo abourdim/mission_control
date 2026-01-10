@@ -27,8 +27,22 @@
 <div class="card-subtitle">Other device</div>
 </div>
 <button class="secondary small" disabled="" id="remoteFsBtn"><span class="btn-icon">⛶</span> Remote fullscreen</button>
+<button class="secondary small" disabled="" id="askRemoteFsBtn" title="Ask the other device to go fullscreen"><span class="btn-icon">📲</span> Ask remote</button>
+<button class="secondary small" id="cleanCacheBtn" title="Clear storage/cache and reload"><span class="btn-icon">🧽</span> Clean cache</button>
 </div>
 <div aria-label="Remote video with local thumbnail" class="videoStage" id="videoStage">
+
+<div id="remoteFsOverlay" class="remote-fs-overlay" aria-hidden="true" style="display:none;">
+  <div class="remote-fs-panel">
+    <div class="remote-fs-title">Fullscreen requested</div>
+    <div class="remote-fs-subtitle">Tap below to enter fullscreen on this device.</div>
+    <div class="remote-fs-actions">
+      <button id="remoteFsAcceptBtn" class="primary">Go fullscreen</button>
+      <button id="remoteFsDenyBtn" class="secondary">Deny</button>
+    </div>
+    <div class="remote-fs-hint">This prompt will hide automatically in 10s.</div>
+  </div>
+</div>
 <video autoplay="" class="video" id="remoteVideo" playsinline=""></video>
 <video autoplay="" class="videoThumb" id="localVideo" muted="" playsinline=""></video>
 </div>
