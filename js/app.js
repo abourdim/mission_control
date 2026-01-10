@@ -169,6 +169,16 @@ function setDataConn(conn){
     setConnStatus("Connected", true);
   }
   conn.on("data", (msg)=>{
+  // RTT: parse ack string "ack for <id>"
+  try {
+    if (typeof msg === "string") {
+      const mm = /ack\s+for\s+([^\s]+)/i.exec(msg);
+      if (mm) rttOnAck(mm[1]);
+    } else if (msg && typeof msg === "object" && msg.type === "ack") {
+      rttOnAck(msg.id || msg._id);
+    }
+  } catch(e) {}
+
   // RTT: match ACKs to sent _id
   try {
     if (typeof msg === "string") {
@@ -1240,3 +1250,27 @@ recBtn?.addEventListener("click",()=>{
     sync();
   });
 })();
+// === RTT tracking (log-only) ===
+const __rttPending = new Map(); // _id -> t0
+let __rttSamples = [];
+
+function __rttLog(line){
+  try{
+    if (typeof logLine === "function") logLine("SYS", line);
+    else if (typeof logEvent === "function") logEvent({dir:"SYS", src:"RTT", msg: line});
+    else console.log(line);
+  }catch(e){}
+}
+function rttMarkSent(msg){
+  if (msg && msg._id) __rttPending.set(msg._id, performance.now());
+}
+function rttOnAck(id){
+  const t0 = __rttPending.get(id);
+  if (t0 == null) return;
+  __rttPending.delete(id);
+  const ms = Math.max(0, performance.now() - t0);
+  __rttSamples.push(ms);
+  if (__rttSamples.length > 40) __rttSamples.shift();
+  const avg = __rttSamples.reduce((a,b)=>a+b,0)/__rttSamples.length;
+  __rttLog(`[RTT] ${Math.round(ms)}ms (avg ${Math.round(avg)}) id=${id}`);
+}
