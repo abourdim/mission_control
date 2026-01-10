@@ -28,17 +28,14 @@
 </div>
 <button class="secondary small" disabled="" id="remoteFsBtn"><span class="btn-icon">⛶</span> Remote fullscreen</button>
 <button class="secondary small" disabled="" id="askRemoteFsBtn" title="Ask the other device to go fullscreen"><span class="btn-icon">📲</span> Ask remote</button>
+<button class="secondary small" id="hudBtn" title="Toggle command overlay on the video"><span class="btn-icon">👁️</span> Show HUD</button>
 
-<label class="hud-toggle" title="Show a small overlay of received commands on the video">
-  <input type="checkbox" id="hudToggle" />
-  <span>Show command HUD</span>
-</label>
+
+
 
 <button class="secondary small" id="cleanCacheBtn" title="Clear storage/cache and reload"><span class="btn-icon">🧽</span> Clean cache</button>
-
-<span id="rttBadge" class="pill" title="Round-trip time based on _id ACKs">RTT —</span>
-<button id="snapBtn" class="btn small" title="Save a PNG snapshot of the remote video">📸 Snapshot</button>
-<button id="recBtn" class="btn small" title="Record the remote video to WebM">⏺️ Record</button>
+<button class="secondary small" id="snapBtn" title="Save a PNG snapshot of the remote video"><span class="btn-icon">📸</span> Snapshot</button>
+<button class="secondary small" id="recBtn" title="Record the remote video to WebM"><span class="btn-icon">⏺️</span> Record</button>
 
 </div>
 <div aria-label="Remote video with local thumbnail" class="videoStage" id="videoStage">

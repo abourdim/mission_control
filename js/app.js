@@ -309,6 +309,7 @@ function sendMsg(obj){
   try{
     rttMarkSent(msg);
 rttMarkSent(msg);
+rttMarkSent(msg);
 dataConn.send(msg);
     logEvent({dir:"TX", src, msg: _fmt(msg)});
     _pending.set(id, { t: Date.now(), msg, tries: 1 });
@@ -1179,8 +1180,7 @@ function rttOnAck(id){
  rtt.last=ms; rtt.samples.push(ms);
  if(rtt.samples.length>rtt.maxSamples)rtt.samples.shift();
  rtt.avg=rtt.samples.reduce((a,b)=>a+b,0)/rtt.samples.length;
- const el=document.getElementById("rttBadge");
- if(el) el.textContent=`RTT ${Math.round(rtt.last)}ms (avg ${Math.round(rtt.avg)})`;
+ // RTT UI badge removed; logging only
 }
 
 // === Snapshot & Recording ===
@@ -1218,3 +1218,25 @@ recBtn?.addEventListener("click",()=>{
  recorder.start();
  recBtn.textContent="⏹️ Stop";
 });
+
+// === HUD toggle button ===
+(function(){
+  const btn = document.getElementById("hudBtn");
+  if (!btn) return;
+  try{
+    const v = localStorage.getItem("tp_hud_enabled");
+    if (v === "0") window.hudEnabled = false;
+  }catch(e){}
+  if (typeof window.hudEnabled === "undefined") window.hudEnabled = true;
+
+  function sync(){
+    btn.classList.toggle("is-on", !!window.hudEnabled);
+    btn.innerHTML = `<span class="btn-icon">👁️</span> ${window.hudEnabled ? "Hide HUD" : "Show HUD"}`;
+}
+  sync();
+  btn.addEventListener("click", ()=>{
+    window.hudEnabled = !window.hudEnabled;
+    try{ localStorage.setItem("tp_hud_enabled", window.hudEnabled ? "1":"0"); }catch(e){}
+    sync();
+  });
+})();
