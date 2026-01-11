@@ -53,11 +53,24 @@ function enableControls(on){
     b.disabled = disabled;
     b.classList.toggle('disabled', disabled);
   });
+  // Text + TTS helpers
   if (sendTextBtn) sendTextBtn.disabled = disabled;
   if (textInput) textInput.disabled = disabled;
+
+  // Remote speak should only be available when the data channel is open
+  const remoteSpeakBtn = document.getElementById("remoteSpeakBtn");
+  if (remoteSpeakBtn) remoteSpeakBtn.disabled = disabled;
 }
 
 enableControls(false);
+
+// Keep "Connect" actions in a sensible state
+function setRoomUiConnected(connected){
+  if (connectBtn) connectBtn.disabled = !!connected;
+  if (roomInput) roomInput.disabled = !!connected;
+  // Hangup is meaningful while a call exists even if the data channel drops
+  if (hangupBtn) hangupBtn.style.display = (connected || !!call) ? "" : "none";
+}
 
 // ---- Remote fullscreen ----
 function updateFsButton(){
@@ -157,6 +170,7 @@ function setDataConn(conn){
   conn.on("open", () => {
     log("Data channel open ✅");
     enableControls(true);
+    setRoomUiConnected(true);
     if (askRemoteFsBtn) askRemoteFsBtn.disabled = false;
     setConnStatus("Connected", true);
   });
@@ -165,6 +179,7 @@ function setDataConn(conn){
   if (conn.open) {
     log("Data channel already open ✅");
     enableControls(true);
+    setRoomUiConnected(true);
     if (askRemoteFsBtn) askRemoteFsBtn.disabled = false;
     setConnStatus("Connected", true);
   }
@@ -295,9 +310,10 @@ function setDataConn(conn){
   conn.on("close", () => {
     log("Data channel closed");
     enableControls(false);
+    setRoomUiConnected(false);
     if (askRemoteFsBtn) askRemoteFsBtn.disabled = true;
-    // If media is still up, we may still be "connected" video-wise, so don't force red.
-    if (!call) setConnStatus("Not connected", false);
+    if (call) setConnStatus("No data channel", false);
+    else setConnStatus("Not connected", false);
   });
   conn.on("error", (e) => {
     if (askRemoteFsBtn) askRemoteFsBtn.disabled = true;
@@ -895,6 +911,17 @@ function mbSetStatus(text, ok=false){
   mbStatus.innerHTML = dot + '<span>' + text + '</span>';
 }
 
+function mbSyncBridgeUi(){
+  if (mbBridgeOnBtn) {
+    mbBridgeOnBtn.disabled = !microbit?.connected || mbBridgeEnabled;
+    mbBridgeOnBtn.textContent = mbBridgeEnabled ? "✅ Sending" : "🚀 Start sending";
+  }
+  if (mbBridgeOffBtn) {
+    mbBridgeOffBtn.disabled = !microbit?.connected || !mbBridgeEnabled;
+    mbBridgeOffBtn.textContent = "🛑 Stop";
+  }
+}
+
 function encodeForMicrobit(msg){
   if (!msg || typeof msg !== "object") return "RAW " + _fmt(msg);
   if (msg.type === "cmd"){
@@ -947,16 +974,19 @@ async function forwardToMicrobitFromPeer(msg){
     },
     onConnectionChange: (ok) => {
       mbSetStatus(ok ? "Connected" : "Disconnected", ok);
+      mbConnectBtn && (mbConnectBtn.disabled = !!ok);
       mbDisconnectBtn && (mbDisconnectBtn.disabled = !ok);
       mbSendTestBtn && (mbSendTestBtn.disabled = !ok);
       mbBridgeOnBtn && (mbBridgeOnBtn.disabled = !ok);
       mbBridgeOffBtn && (mbBridgeOffBtn.disabled = !ok);
       mbMuteMbBtn && (mbMuteMbBtn.disabled = !ok);
       if (!ok) mbBridgeEnabled = false;
+      mbSyncBridgeUi();
     }
   });
 
   mbSetStatus("Disconnected", false);
+  mbSyncBridgeUi();
 
   mbConnectBtn.addEventListener("click", async () => {
     try{
@@ -988,10 +1018,12 @@ async function forwardToMicrobitFromPeer(msg){
 
   mbBridgeOnBtn?.addEventListener("click", () => {
     mbBridgeEnabled = true;
+    mbSyncBridgeUi();
     logEvent({dir:"SYS", src:"MB", msg:"bridge enabled (peer → micro:bit)"});
   });
   mbBridgeOffBtn?.addEventListener("click", () => {
     mbBridgeEnabled = false;
+    mbSyncBridgeUi();
     logEvent({dir:"SYS", src:"MB", msg:"bridge disabled"});
   });
 })();
@@ -1274,9 +1306,10 @@ recBtn?.addEventListener("click",()=>{
   if (!btn) return;
   try{
     const v = localStorage.getItem("tp_hud_enabled");
+    if (v === "1") window.hudEnabled = true;
     if (v === "0") window.hudEnabled = false;
   }catch(e){}
-  if (typeof window.hudEnabled === "undefined") window.hudEnabled = true;
+  if (typeof window.hudEnabled === "undefined") window.hudEnabled = false;
 
   function sync(){
     btn.classList.toggle("is-on", !!window.hudEnabled);
@@ -1320,11 +1353,11 @@ function rttOnAck(id){
   const bar = document.getElementById("rxBar");
   if (!btn || !bar) return;
 
-  // default ON
-  let on = true;
+  // default OFF
+  let on = false;
   try{
     const v = localStorage.getItem("tp_rxbar_on");
-    if (v === "0") on = false;
+    if (v === "1") on = true;
   }catch(e){}
 
   function sync(){
