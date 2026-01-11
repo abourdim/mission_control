@@ -879,9 +879,10 @@ function mbOnAck(id){
   return Math.max(0, performance.now() - t0);
 }
 async function mbSendLineWithId(line, id){
+  // Option A protocol: send lines that micro:bit code understands directly
+  // e.g. "CMD RIGHT 1" (micro:bit expects the line to start with CMD)
   const useId = id || ("mb" + Date.now());
-  const payload = `ID ${useId} ${line}`;
-  mbMarkSent(useId);
+  const payload = String(line || "").trim();
   await microbit.sendLine(payload);
   logEvent({dir:"TX", src:"MB", msg: payload});
   return useId;
