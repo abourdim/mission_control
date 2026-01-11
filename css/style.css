@@ -2427,3 +2427,23 @@ details.collapsible[open] > summary::before {
 details.collapsible > .card {
   margin-top: 8px;
 }
+
+/* === Mini Mission Control branding === */
+.app-title{
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  color: #35e0b7;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 6px rgba(53,224,183,.45),
+    0 0 14px rgba(53,224,183,.25);
+}
+
+.app-subtitle{
+  margin-top: 2px;
+  font-size: 12px;
+  letter-spacing: 1.2px;
+  color: #f3c623;
+  opacity: 0.95;
+}
