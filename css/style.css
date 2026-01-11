@@ -2454,13 +2454,18 @@ details.collapsible > .card {
 .bismillah {
     position: absolute;
     top: 6px;
-    left: 50%;
-    transform: translateX(-50%);
+    inset-inline: 0;           /* RTL/LTR-safe full-width anchor */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
     font-family: "Amiri", "Noto Naskh Arabic", serif;
     font-size: 12px;
     font-weight: 400;
+    letter-spacing: 0.08em;
     opacity: 0.20;
     color: rgba(200, 230, 255, 0.9);
+
     white-space: nowrap;
     pointer-events: none;
     user-select: none;
