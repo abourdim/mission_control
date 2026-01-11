@@ -2360,4 +2360,57 @@ button.disabled{
     gap: 22px !important;
   }
 }
+/* =========================
+   STOP button – internal siren 🚨
+   ========================= */
+
+.fire-btn {
+  position: relative;
+  overflow: hidden;
+
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+
+  background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+  color: #fff !important;
+
+  border-radius: 14px !important;
+  border: 2px solid rgba(255,255,255,0.6) !important;
+
+  padding-left: 38px; /* space for siren */
+
+  box-shadow:
+    0 4px 10px rgba(239,68,68,0.35);
+
+  transition: transform 0.12s ease;
+}
+
+/* 🚨 Siren icon INSIDE the button */
+.fire-btn::before {
+  content: "🚨";
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.1rem;
+
+  animation: siren-blink 1s infinite ease-in-out;
+}
+
+/* Urgent but calm blink */
+@keyframes siren-blink {
+  0%   { opacity: 0.35; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.35; }
+}
+
+/* Interaction stays subtle */
+.fire-btn:hover {
+  transform: translateY(-1px) scale(1.03);
+}
+
+.fire-btn:active {
+  transform: scale(0.97);
+}
 
