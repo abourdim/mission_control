@@ -228,6 +228,16 @@ function setDataConn(conn){
 
     // UI messages (remote fullscreen)
     if (msg && typeof msg === "object" && msg.type === "ui"){
+      // Remote SPEAK command: make the receiving device speak text locally
+      if (msg.cmd === "SPEAK"){
+        const reqId = msg._id || msg.id || msg.reqId || "";
+        const t = (msg.text || msg.say || "").toString();
+        try{ if (typeof window.__tpSpeakLocal === "function") window.__tpSpeakLocal(t); }catch(e){}
+        logEvent({dir:"RX", src:"UI", msg:"SPEAK " + (t ? ("\"" + t.slice(0,40) + (t.length>40?"…":"") + "\"") : "")});
+        // respond so the sender can log it
+        if (reqId) sendUiMessage({type:"ui", cmd:"SPEAK_RESPONSE", reqId, status:"OK"});
+        return;
+      }
       if (msg.cmd === "REMOTE_FULLSCREEN_REQUEST"){
         const reqId = msg.reqId || msg.id || msg._id || "";
         if (!isViewerDevice()){
@@ -1331,21 +1341,52 @@ function rttOnAck(id){
 })();
 
 
-/* === SPEAK BUTTON === */
+/* === SPEAK BUTTONS === */
 (function(){
-  const btn = document.getElementById("speakBtn");
-  if(!btn) return;
-  btn.addEventListener("click", ()=>{
-    const input = document.getElementById("textInput");
-    if(!input || !input.value) return;
-    if(!("speechSynthesis" in window)){
-      try{ if(typeof logLine==="function") logLine("SYS","[TTS] not supported"); }catch(e){}
+  const speakBtn = document.getElementById("speakBtn");
+  const remoteSpeakBtn = document.getElementById("remoteSpeakBtn");
+  const input = document.getElementById("textInput");
+
+  function logSys(line){
+    try{
+      if (typeof logLine === "function") logLine("SYS", line);
+      else if (typeof logEvent === "function") logEvent({dir:"SYS", src:"TTS", msg: line});
+      else console.log(line);
+    }catch(e){}
+  }
+
+  function speakLocal(text){
+    if (!text) return;
+    if (!("speechSynthesis" in window)){
+      logSys("[TTS] not supported");
       return;
     }
     speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(input.value);
+    const u = new SpeechSynthesisUtterance(text);
     u.lang = navigator.language || "en-US";
     speechSynthesis.speak(u);
-    try{ if(typeof logLine==="function") logLine("SYS","[TTS] "+input.value); }catch(e){}
+    logSys("[TTS] speak local: " + text);
+  }
+
+  speakBtn?.addEventListener("click", ()=>{
+    const t = (input?.value || "").trim();
+    if (!t) return;
+    speakLocal(t);
   });
+
+  // Send a command to the OTHER device to speak this text locally on that device.
+  remoteSpeakBtn?.addEventListener("click", ()=>{
+    const t = (input?.value || "").trim();
+    if (!t) return;
+
+    const mid = sendMsg({ type:"ui", cmd:"SPEAK", text:t, _src:"TTS" });
+    if (!mid){
+      logSys("[TTS] remote speak not sent (data channel not open yet).");
+      return;
+    }
+    logSys("[TTS] remote speak requested (id: " + mid + ")");
+  });
+
+  // Expose for receiver handler
+  window.__tpSpeakLocal = speakLocal;
 })();

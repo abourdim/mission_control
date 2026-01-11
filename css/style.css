@@ -2153,3 +2153,52 @@ button.disabled{
 @media (max-width: 520px){
   #sendTextBtn, #speakBtn{flex:1 1 auto;}
 }
+
+
+/* Send Text: keep Send + Speak on same line */
+.sendtext-row{
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+.sendtext-row input{
+  min-width: 0;
+}
+.sendtext-actions{
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+.sendtext-actions .secondary{
+  white-space: nowrap;
+}
+@media (max-width: 520px){
+  .sendtext-row{
+    grid-template-columns: 1fr;
+  }
+  .sendtext-actions{
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+}
+
+
+/* === Send text: input above buttons === */
+.sendtext-row{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.sendtext-row > input#textInput{
+  width:100%;
+}
+.sendtext-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+
